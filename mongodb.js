@@ -47,6 +47,8 @@ module.exports = function(RED) {
     const args = Array.prototype.slice.call(arguments, 0);
     const callback = args.pop();
     mongodb.Collection.prototype.find.apply(this, args).toArray(callback);
+    //db query
+    //collection.find.count
   };
   operations['find.forEach'] = function() {
     const args = Array.prototype.slice.call(arguments, 0);
@@ -59,6 +61,7 @@ module.exports = function(RED) {
   };
 
   // We don't want to pass the aggregate's cursor directly.
+
   delete operations.aggregate;
   operations['aggregate.toArray'] = function() {
     const args = Array.prototype.slice.call(arguments, 0);
@@ -92,6 +95,25 @@ module.exports = function(RED) {
     });
   };
 
+     delete operations.count;
+     operations['testObjectId_4.0'] = function() {
+      // console.log(args1);
+     };
+
+     delete operations.count;
+     operations['testCount_4.0'] = function() {
+      selector = ensureValidSelectorObject(msg.payload);
+      coll.count(selector, function(err, count) {
+          if (err) {
+              node.error(err);
+          }
+          else {
+              msg.payload = count;
+              node.send(msg);
+          }
+      });
+     };
+
    // We don't want to pass the listCollections's cursor directly.
    delete operations.listCollections;
    operations['db.listCollections.toArray'] = function() {
@@ -120,6 +142,12 @@ module.exports = function(RED) {
     return callback(null, this);
   };
 
+  function ensureValidSelectorObject(selector) {
+    if (selector != null && (typeof selector != 'object' || Buffer.isBuffer(selector))) {
+        return {};
+    }
+    return selector;
+}
   RED.nodes.registerType("mongodb3", function MongoConfigNode(n) {
     RED.nodes.createNode(this, n);
     this.uri = '' + n.uri;
@@ -260,15 +288,20 @@ module.exports = function(RED) {
           node.error("No operation defined", msg);
           return messageHandlingCompleted();
         }
-        let collection; // stays undefined in the case of "db" operation.
+        let collection;
+        let args1; // stays undefined in the case of "db" operation.
         if (
                   operation != operations.db &&
                   operation != operations['db.listCollections.toArray'] &&
-                  operation != operations['db.listCollections.forEach']
+                  operation != operations['db.listCollections.forEach'] &&
+                  operation != operations['testObjectID_4.0'] &&
+                  operation != operations['testCount_4.0']
                ) {
           collection = nodeCollection;
           if (!collection && msg.collection) {
             collection = client.db.collection(msg.collection);
+            args1 = msg.payload;
+            console.log(args1);
           }
           if (!collection) {
             node.error("No collection defined", msg);
@@ -279,6 +312,8 @@ module.exports = function(RED) {
         delete msg.collection;
         delete msg.operation;
         let args = msg.payload;
+        console.log(operation.toString());
+        console.log(JSON.stringify(args))
         if (!Array.isArray(args)) {
           args = [args];
         }
@@ -294,8 +329,10 @@ module.exports = function(RED) {
           args = args.slice(0, operation.length - 1);
         }
         profiling.requests += 1;
-        debounceProfilingStatus();
+        debounceProfilingStatus();     
+        
         try {
+          console.log("am called buddy")
           operation.apply(collection || client.db, args.concat(function(err, response) {
             if (err && (forEachIteration != err) && (forEachEnd != err)) {
               profiling.error += 1;
