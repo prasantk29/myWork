@@ -19,8 +19,10 @@ module.exports = function(RED) {
   const EventEmitter = require('events').EventEmitter;
   const appEnv = require('cfenv').getAppEnv();
   const mongodb = require('mongodb');
+  var ObjectId = require('mongodb').ObjectID;
   const forEachIteration = new Error("node-red-contrib-mongodb3 forEach iteration");
   const forEachEnd = new Error("node-red-contrib-mongodb3 forEach end");
+  const count = new Error("node-red-contrib-mongodb3 count")
 
   let services = [];
   Object.keys(appEnv.services).forEach(function(label) {
@@ -45,8 +47,43 @@ module.exports = function(RED) {
 
   operations['find.toArray'] = function() {
     const args = Array.prototype.slice.call(arguments, 0);
+    //console.log("!" +JSON.stringify(args));
+    // var t = JSON.stringify(Array.prototype.slice.call(arguments));
+    // console.log("!" +t);
+    // var s = JSON.stringify(args,['_id']);
+    // console.log("1 :" +s)
+    // console.log("2 "+s.supplier);
+    //const args = ['_id': ObjectId("5d2b9e47f16a123eeb73a45b")},null];
+    //console.log("inside function" +args);
+    //args = JSON.parse(args);
+    //console.log("!" +args));
+    //[{"_id":"1234567898bbb"},null]
+    //console.log("!!" +JSON.stringify(args));
+    //console.log(mongodb.Collection.prototype.find.app ly(this, args));
     const callback = args.pop();
-    mongodb.Collection.prototype.find.apply(this, args).toArray(callback);
+    //console.log("inside call" +callback);
+    // console.log("mongodb :" +mongodb);
+    // console.log("1 :" +mongodb.Collection);
+    // console.log("2 :" +mongodb.collection);    
+    // console.log("3 :" +mongodb.Db);
+    // console.log("4 :" +mongodb.Collection.prototype);
+    // console.log("6 :" +mongodb.Db.prototype);
+
+    //console.log("4 :" +mongodb.Collection.prototype.find.applythis, args();
+
+    //original
+    // mongodb.Collection.prototype.find.apply(this, args).toArray(callback);
+        
+    var c = null;
+    c = mongodb.Collection.prototype.find.apply(this, args).count();
+    console.log(c);
+
+    // mongodb.Collection.prototype.find.apply(this, args).count().then(function(doc){
+    //   return callback(count,doc);
+    // }, function(err) {
+    //   return callback(err);
+    // }
+    //);
     //db query
     //collection.find.count
   };
@@ -66,6 +103,8 @@ module.exports = function(RED) {
   operations['aggregate.toArray'] = function() {
     const args = Array.prototype.slice.call(arguments, 0);
     const callback = args.pop();
+   // console.log(args);
+
     mongodb.Collection.prototype.aggregate.apply(this, args).toArray(callback);
   };
   operations['aggregate.forEach'] = function() {
@@ -280,6 +319,7 @@ module.exports = function(RED) {
       });
 
       function handleMessage(msg) {
+        console.log("inside handlemesssage :" +JSON.stringify(msg));
         let operation = nodeOperation;
         if (!operation && msg.operation) {
           operation = operations[msg.operation];
@@ -288,8 +328,7 @@ module.exports = function(RED) {
           node.error("No operation defined", msg);
           return messageHandlingCompleted();
         }
-        let collection;
-        let args1; // stays undefined in the case of "db" operation.
+        let collection; // stays undefined in the case of "db" operation.
         if (
                   operation != operations.db &&
                   operation != operations['db.listCollections.toArray'] &&
@@ -312,8 +351,8 @@ module.exports = function(RED) {
         delete msg.collection;
         delete msg.operation;
         let args = msg.payload;
-        console.log(operation.toString());
-        console.log(JSON.stringify(args))
+        //console.log("function called " +operation.toString());
+        console.log("lev1   :    " +JSON.stringify(args))
         if (!Array.isArray(args)) {
           args = [args];
         }
@@ -333,7 +372,9 @@ module.exports = function(RED) {
         
         try {
           console.log("am called buddy")
+          console.log("loop b4     :     " +args.concat());
           operation.apply(collection || client.db, args.concat(function(err, response) {
+            console.log("try block function called")
             if (err && (forEachIteration != err) && (forEachEnd != err)) {
               profiling.error += 1;
               debounceProfilingStatus();
@@ -365,7 +406,7 @@ module.exports = function(RED) {
 							delete response.message;              
 							
               // send msg (when err == forEachEnd, this is just a forEach completion).
-              if (forEachIteration == err) {
+              if (forEachIteration == err && count ==err) {
                 // Clone, so we can send the same message again with a different payload
                 // in each iteration.
                 const messageToSend = RED.util.cloneMessage(msg);
